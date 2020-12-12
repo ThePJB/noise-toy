@@ -1,6 +1,7 @@
 # Controls
  * R for new seed
  * number keys to change noise fn
+ * space to toggle 2d and 3d
 
 # Noises
 ## Currently doing:
@@ -10,7 +11,7 @@
  * ridge noise
 
 ## Planned noise:
- *  Nicer value noise
+ *  Nicer value noise, smooth it out cubic or quintic
  * Gradient noise [IQ](https://www.iquilezles.org/www/articles/gradientnoise/gradientnoise.htm)
  * Derivatives, fake erosion
  * Voronoi [IQ1](https://www.iquilezles.org/www/articles/voronoise/voronoise.htm) [IQ2](https://www.iquilezles.org/www/articles/smoothvoronoi/smoothvoronoi.htm)
