@@ -1,6 +1,6 @@
 #include <SDL.h>
 #include <stdbool.h>
-#include "gef.h"
+#include "ggl.h"
 #include "mymath.h"
 
 #define U32_MAX 0xFFFFFFFF
@@ -140,9 +140,10 @@ typedef struct {
     float wy;
 } transform_2d;
 
+/*
 void draw_noise(float (*noise_func)(float x, float y, uint32_t seed), transform_2d t, uint32_t seed) {
-    int xres = gef_get_xres();
-    int yres = gef_get_yres();
+    //int xres = gef_get_xres();
+    //int yres = gef_get_yres();
 
     const float max = 2;
 
@@ -177,11 +178,10 @@ void draw_3d_noise_time(float (*noise_func)(float x, float y, float z, uint32_t 
 void draw_noise_heightmap(float (*noise_func)(float x, float y, uint32_t seed), transform_2d t, uint32_t seed) {
 
 }
+*/
 
 int main(int argc, char** argv) {
-    gef_init();
-    //gef_set_res(1024, 720);
-    gef_set_name("nxplore");
+    gg_context *g = ggl_init("nxplore");
 
     float (*noise_func)(float x, float y, uint32_t seed) = quant_err;
     float (*noise_func3)(float x, float y, float z, uint32_t seed) = quant_err3;
@@ -214,6 +214,7 @@ int main(int argc, char** argv) {
     bool do_2d = true;
     bool keep_going = true;
     while(keep_going) {
+        SDL_GL_SwapWindow(g->window);
         // Handle Input
         SDL_Event e;
         while (SDL_PollEvent(&e) != 0) {
@@ -237,7 +238,9 @@ int main(int argc, char** argv) {
                 }
             }
         }
+    }
 
+/*
         gef_clear();
 
         if (do_2d) {
@@ -251,4 +254,10 @@ int main(int argc, char** argv) {
     }
 
     gef_teardown();
+    */
+    ggl_teardown(g);
+}
+
+void frame(double dt) {
+
 }
