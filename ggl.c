@@ -1,4 +1,5 @@
 #include <cglm/struct.h>
+#include <stdarg.h>
 #include "glad.h"
 #include "ggl.h"
 
@@ -14,11 +15,11 @@ void ggl_teardown(gg_context *g) {
     SDL_Quit();
 }
 
-gg_context *ggl_init(char *title) {
+gg_context *ggl_init(char *title, int xres, int yres) {
     printf("Initializing ggl...\n");
     gg_context *g = calloc(1, sizeof(gg_context));
-    g->xres = 640;
-    g->yres = 480;
+    g->xres = xres;
+    g->yres = yres;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) ggl_die(g, "couldn't init SDL\n");
     SDL_GL_LoadLibrary(NULL);
@@ -50,7 +51,8 @@ gg_context *ggl_init(char *title) {
     printf("Version:  %s\n", glGetString(GL_VERSION));
 
     SDL_GL_SetSwapInterval(1);
-    glDisable(GL_DEPTH_TEST);
+    //glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
     // if in fullscreen mode we need to ask res
@@ -59,4 +61,76 @@ gg_context *ggl_init(char *title) {
     glClearColor(0.0f, 0.5f, 1.0f, 0.0f);
 
     return g;
+}
+
+shader_id ggl_make_shader(gg_context *g, char *program, unsigned int type) {
+    unsigned int shader = glCreateShader(type);
+    glShaderSource(shader, 1, (const GLchar * const*)&program, NULL);
+    glCompileShader(shader);
+    int success = 0;
+    char buf[512] = {0};
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+
+    if (!success) {
+        glGetShaderInfoLog(shader, 512, NULL, buf);
+        printf("error compiling: %s\n", buf);
+        ggl_die(g, "couldn't compile shader");
+    }
+
+    return (shader_id)shader;
+}
+
+shader_pgm_id ggl_make_shader_pgm(gg_context *g, shader_id vertex_shader, shader_id fragment_shader) {    
+    int success;
+    char buf[512] = {0};
+    shader_pgm_id shader_program;
+    shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+
+    glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(shader_program, 512, NULL, buf);
+        printf("error linking shaders: %s\n", buf);
+        ggl_die(g, "couldn't make shader program");
+    }
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+    return shader_program;
+}
+
+// i have a feeling doing this for fresh for every chunk may have been why it was slow in voxelgame
+// or maybe leaking vbo or something idk
+vao ggl_upload_pnc(PNC_Mesh m) {
+    vao pnc_vao;
+    vbo pnc_vbo;
+    glGenVertexArrays(1, &pnc_vao);
+    glGenBuffers(1, &pnc_vbo);
+    glBindVertexArray(pnc_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, pnc_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(PNC_Tri) * m.num_tris, m.tris, GL_STATIC_DRAW);
+    
+    size_t offset = 0;
+
+    // pos
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PNC_Vert), (void*)offset);
+    glEnableVertexAttribArray(0);
+    offset += 3 * sizeof(float);
+
+    // true is for normalize (normal)
+    // normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PNC_Vert), (void*)offset);
+    glEnableVertexAttribArray(1);
+    offset += 3 * sizeof(float);
+    
+    // colour
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(PNC_Vert), (void*)offset);
+    glEnableVertexAttribArray(2);
+    offset += 3 * sizeof(float);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    return pnc_vao;
 }

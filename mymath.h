@@ -1,3 +1,5 @@
+#pragma once
+
 float fastfloor(float x);
 float fast_abs(float x);
 float frac(float x);
@@ -9,3 +11,6 @@ float trilinear(float a, float b, float c, float d, float e, float f, float g, f
 float bilinear3(float a, float b, float c, float d, float t1, float t2);
 float trilinear3(float a, float b, float c, float d, float e, float f, float g, float h, float x, float y, float z);
 float quant_err(float x, float y, uint32_t seed);
+
+#define min(A,B) A < B ? A : B
+#define max(A,B) A > B ? A : B
