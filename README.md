@@ -26,8 +26,16 @@
  * 3d terrain view
  * colour palette
  * colour/time dimensions
- 
+ * 2d heightmap but with 3d domain warping for cliffs? may have sort of tried that
+ * add a water plane
 
 # More reading and notes
  * [hash + noise function guts -- not that hard](https://www.youtube.com/watch?v=LWFzPP8ZbdU)
  * [hello games awesome noise talk](https://www.youtube.com/watch?v=C9RyEiEzMiU)
+
+
+# refactoring ideas
+camera to its own thing
+noise to its own thing
+
+mesh should maybe just contain a vao

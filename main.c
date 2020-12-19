@@ -6,59 +6,8 @@
 #include "mymath.h"
 #include "util.h"
 #include "glad.h"
-
-typedef struct {
-    vec3s pos;
-    vec3s front;
-    vec3s up;
-    float pitch;
-    float yaw;
-    float fovx;
-} camera;
-
-camera fly_camera() {
-    camera cam;
-
-    cam.pos = (vec3s) {0,0,0};
-    cam.front = (vec3s) {0,0,-1};
-    cam.up = (vec3s) {0,1,0};
-    cam.pitch = 0;
-    cam.yaw = -90;
-    cam.fovx = 90;
-
-    return cam;
-}
-
-#define U32_MAX 0xFFFFFFFF
-#define len(X) (sizeof(X) / sizeof(X[0]))
-
-uint32_t squirrel3(int position, uint32_t seed) {
-    const unsigned int BIT_NOISE1 = 0xB5297A4D;
-    const unsigned int BIT_NOISE2 = 0x68E31DA4;
-    const unsigned int BIT_NOISE3 = 0x1B56C4E9;
-
-    unsigned int mangled = position;
-    mangled *= BIT_NOISE1;
-    mangled += seed;
-    mangled ^= (mangled >> 8);
-    mangled += BIT_NOISE2;
-    mangled ^= (mangled << 8);
-    mangled *= BIT_NOISE3;
-    mangled ^= (mangled >> 8);
-    return mangled;
-}
-
-uint32_t squirrel3_2(int posx, int posy, uint32_t seed) {
-    const int PRIME_NUMBER = 198491317;
-    return squirrel3(posx + posy * PRIME_NUMBER, seed);
-}
-
-uint32_t squirrel3_3(int posx, int posy, int posz, uint32_t seed) {
-    const int PRIME1 = 198491317;
-    const int PRIME2 = 6542989;
-
-    return squirrel3(posx + posy * PRIME1 + PRIME2 * posz, seed);
-}
+#include "noise.h"
+#include "camera.h"
 
 
 
@@ -70,74 +19,12 @@ float quant_err(float x, float y, uint32_t seed) {
     return (x - fastfloor(x) + y - fastfloor(y)) / 2;
 }
 
-// bug
+// bugged
 float quant_err3(float x, float y, float z, uint32_t seed) {
     return frac(x) + frac(y) + frac(z) / 3;
 }
 
-float noise2_bilinear(float x, float y, uint32_t seed) {
-    // actually need to sub kx/2 or something
-    // kernel will be uniform rn anyway for this scale
 
-    //return bilinear(
-    return bilinear3(
-        (double) squirrel3_2(x, y, seed) / U32_MAX,
-        (double) squirrel3_2(x + 1, y, seed) / U32_MAX,
-        (double) squirrel3_2(x, y + 1, seed) / U32_MAX,
-        (double) squirrel3_2(x + 1, y + 1, seed) / U32_MAX,
-        frac(x),
-        frac(y)
-        );
-}
-
-float noise3_trilinear(float x, float y, float z, uint32_t seed) {
-    //return trilinear(
-    return trilinear3(
-        (double) squirrel3_3(x,y,z,seed) / U32_MAX,
-        (double) squirrel3_3(x+1,y,z,seed) / U32_MAX,
-        (double) squirrel3_3(x,y+1,z,seed) / U32_MAX,
-        (double) squirrel3_3(x+1,y+1,z,seed) / U32_MAX,
-        (double) squirrel3_3(x,y,z+1,seed) / U32_MAX,
-        (double) squirrel3_3(x+1,y,z+1,seed) / U32_MAX,
-        (double) squirrel3_3(x,y+1,z+1,seed) / U32_MAX,
-        (double) squirrel3_3(x+1,y+1,z+1,seed) / U32_MAX,
-        frac(x),
-        frac(y),
-        frac(z)
-    );
-}
-
-float fbm2_bilinear(float x, float y, uint32_t seed) {
-    float freq = 1;
-    float amplitude = 1;
-    float acc = 0;
-    for (int i = 0; i < 5; i++) {
-        acc += amplitude * noise2_bilinear(x*freq, y*freq, (1234+i)*seed);
-        freq *= 2;
-        amplitude /= 2;
-    }
-    return acc;
-}
-
-float fbm3(float x, float y, float z, uint32_t seed) {
-    float freq = 1;
-    float amplitude = 1;
-    float acc = 0;
-    for (int i = 0; i < 4; i++) {
-        acc += amplitude * noise3_trilinear(x*freq, y*freq, z*freq, (1234+i)*seed);
-        freq *= 2;
-        amplitude /= 2;
-    }
-    return acc;
-}
-
-float billow(float x, float y, uint32_t seed) {
-    return fast_abs(fbm2_bilinear(x, y, seed) * 2 - 2);
-}
-
-float ridge(float x, float y, uint32_t seed) {
-    return 2 - billow(x, y, seed);
-}
 
 float fbm2_bilinear_domwarp1(float x, float y, uint32_t seed) {
     const float warp_coeff = 1;
@@ -219,40 +106,8 @@ PNC_Vert make_vert(float x, float y, float z, vec3s normal) {
     return (PNC_Vert) {
             .pos = {x, y, z},
             .normal = normal,
-            //.colour = high_colour,
             .colour = glms_vec3_lerp(low_colour, high_colour, y),
     };
-}
-/*
-PNC_Mesh generate_test_cube() {
-    PNC_Mesh m = {0};
-    m.num_tris = 12;
-    m.tris = calloc(num_tris, sizeof(PNC_Tri));
-
-
-
-}
-*/
-
-camera camera_update(camera c, int x, int y) {
-    const float sensitivity = 0.05;
-
-    float xf = sensitivity * x;
-    float yf = sensitivity * y;
-
-    c.yaw += xf;
-    c.pitch -= yf;
-
-    c.pitch = min(c.pitch, 89);
-    c.pitch = max(c.pitch, -89);
-
-    vec3s direction;
-    direction.x = cos(glm_rad(c.yaw)) * cos(glm_rad(c.pitch));
-    direction.y = sin(glm_rad(c.pitch));
-    direction.z = sin(glm_rad(c.yaw)) * cos(glm_rad(c.pitch));
-    c.front = glms_normalize(direction);
-
-    return c;
 }
 
 // alloc and make a mesh
@@ -260,9 +115,6 @@ PNC_Mesh generate_mesh(float (*noise_func)(float x, float y, uint32_t seed),
         uint32_t seed,
         float startx, float endx, int xsamples,
         float starty, float endy, int ysamples) {
-
-    //int num_quads = ((endx - startx) / stepx) *
-                    //((endy - starty) / stepy);
 
     float stepx = (endx - startx) / xsamples;
     float stepy = (endy - starty) / ysamples;
@@ -320,40 +172,38 @@ PNC_Mesh generate_mesh(float (*noise_func)(float x, float y, uint32_t seed),
     return m;
 }
 
+typedef enum {
+    NM_DOMWARP_3,
+    NM_RIDGE,
+    NM_BILLOW,
+    NUM_NM,
+} noise_mode;
+
+//PNC_Mesh meshes[NUM_NM] = {0};
+
+typedef float(*noise2d_func)(float, float, uint32_t);
+
+noise2d_func noise_funcs[NUM_NM] = {
+    fbm2_bilinear_domwarp3,
+    billow,
+    ridge,
+};
+
+vao nm_vao[NUM_NM] = {0};
+PNC_Mesh nm_mesh[NUM_NM] = {0};
+
 int main(int argc, char** argv) {
     int xres = 1920;
     int yres = 1080;
 
+    int noise_mode = 0;
+
     gg_context *g = ggl_init("nxplore", xres, yres);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-    float (*noise_func)(float x, float y, uint32_t seed) = quant_err;
-    float (*noise_func3)(float x, float y, float z, uint32_t seed) = quant_err3;
     uint32_t seed = 123456;
 
     float t = 0;
-
-    transform_2d tform = {
-        0, 0, 10.0, 10.0 * 3.0 / 4.0
-    };
-
-    float (*noise_funcs[])(float x, float y, uint32_t seed) = {
-        quant_err,
-        noise2_bilinear,
-        fbm2_bilinear,
-        fbm2_bilinear_domwarp1,
-        fbm2_bilinear_domwarp2,
-        fbm2_bilinear_domwarp3,
-        billow,
-        ridge,
-    };
-
-    float  (*noise_funcs3[])(float x, float y, float z, uint32_t seed) = {
-        quant_err3,
-        noise3_trilinear,
-        fbm3,
-        fbm3_domwarp1,
-    };
 
     // make shaders
     char *vert = slurp("heightmap.vert");
@@ -368,30 +218,10 @@ int main(int argc, char** argv) {
     free(vert);
     free(frag);
 
-    // make world
-    PNC_Mesh m = generate_mesh(fbm2_bilinear_domwarp3, seed,
-        -5, 5, 1000,
-        -5, 5, 1000
-    );
-
-    /*
-    // make world
-    PNC_Mesh m = generate_mesh(fbm2_bilinear_domwarp3, seed,
-        -1, 0.5, 1,
-        -1, 0.5, 1
-    );
-    */
-
-    vao heightmap_vao = ggl_upload_pnc(m);
-    free(m.tris);
-
-    // camera
-
     camera cam = fly_camera();
     
     mat4s view = GLMS_MAT4_IDENTITY_INIT;
     mat4s proj = GLMS_MAT4_IDENTITY_INIT;
-
 
     bool do_2d = true;
     bool keep_going = true;
@@ -422,11 +252,17 @@ int main(int argc, char** argv) {
                 } else if (sym == SDLK_SPACE) {
                     do_2d = !do_2d;
                 } else if (sym >= SDLK_1 && sym <= SDLK_9) {
-                    if (sym - SDLK_1 < len(noise_funcs)) {
-                        noise_func = noise_funcs[sym -SDLK_1];
-                    }
-                    if (sym - SDLK_1 < len(noise_funcs3)) {
-                        noise_func3 = noise_funcs3[sym - SDLK_1];
+                    int nm = sym - SDLK_1;
+                    if (nm < NUM_NM) {
+                        noise_mode = nm;
+                        if (!nm_mesh[nm].tris) {
+                            // if we need to generate this one
+                            nm_mesh[nm] = generate_mesh(noise_funcs[nm], seed,
+                                -5, 5, 1000,
+                                -5, 5, 1000
+                            );
+                            nm_vao[nm] = ggl_upload_pnc(nm_mesh[nm]);
+                        }
                     }
                 }
             } else if (e.type == SDL_MOUSEMOTION) {
@@ -463,29 +299,12 @@ int main(int argc, char** argv) {
         glUseProgram(heightmap_pgm);
         glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "view"), 1, GL_FALSE, view.raw[0]);
         glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "proj"), 1, GL_FALSE, proj.raw[0]);
-        glBindVertexArray(heightmap_vao);
-        glDrawArrays(GL_TRIANGLES, 0, m.num_tris * 3); // handle should probably contain num triangles
+        glBindVertexArray(nm_vao[noise_mode]);
+        glDrawArrays(GL_TRIANGLES, 0, nm_mesh[noise_mode].num_tris * 3); // handle should probably contain num triangles
 
         SDL_GL_SwapWindow(g->window);
-
-        //printf("cam pos %.2f %.2f %.2f\n", cam.pos.x, cam.pos.y, cam.pos.z);
     }
 
-/*
-        gef_clear();
-
-        if (do_2d) {
-            draw_noise(noise_func, tform, seed);
-        } else {
-            draw_3d_noise_time(noise_func3, tform, seed, t);
-            t += 0.03;
-        }
-        
-        gef_present();
-    }
-
-    gef_teardown();
-    */
     ggl_teardown(g);
 }
 
