@@ -39,3 +39,6 @@ camera to its own thing
 noise to its own thing
 
 mesh should maybe just contain a vao
+
+add R to regenerate
+make it infinite

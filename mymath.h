@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cglm/struct.h>
+
 float fastfloor(float x);
 float fast_abs(float x);
 float frac(float x);
@@ -14,3 +16,5 @@ float quant_err(float x, float y, uint32_t seed);
 
 #define min(A,B) A < B ? A : B
 #define max(A,B) A > B ? A : B
+
+vec3s normal_from_verts(vec3s a, vec3s b, vec3s c);

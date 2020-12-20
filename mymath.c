@@ -1,3 +1,5 @@
+#include "mymath.h"
+
 float fastfloor(float x) {
     if (x > 0) {
         return (int)x;
@@ -43,4 +45,10 @@ float bilinear3(float a, float b, float c, float d, float t1, float t2) {
 }
 float trilinear3(float a, float b, float c, float d, float e, float f, float g, float h, float x, float y, float z) {
     return interp3(bilinear3(a,b,c,d,x,y), bilinear3(e, f, g, h, x, y), z);
+}
+
+vec3s normal_from_verts(vec3s a, vec3s b, vec3s c) {
+    vec3s ab = glms_vec3_sub(b,a);
+    vec3s bc = glms_vec3_sub(c,a);
+    return glms_vec3_normalize(glms_vec3_cross(bc, ab));
 }

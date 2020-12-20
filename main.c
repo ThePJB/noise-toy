@@ -9,112 +9,25 @@
 #include "noise.h"
 #include "camera.h"
 
-
-
-// todo smooth it out (kernel interp etc)
-// then do gradient noise, see how fast it can get and if it look good
-
-
-float quant_err(float x, float y, uint32_t seed) {
-    return (x - fastfloor(x) + y - fastfloor(y)) / 2;
-}
-
-// bugged
-float quant_err3(float x, float y, float z, uint32_t seed) {
-    return frac(x) + frac(y) + frac(z) / 3;
-}
-
-
-
-float fbm2_bilinear_domwarp1(float x, float y, uint32_t seed) {
-    const float warp_coeff = 1;
-    return fbm2_bilinear(x + warp_coeff * fbm2_bilinear(x, y, seed+69), y + warp_coeff * fbm2_bilinear(x,y,seed+420), seed);
-}
-
-float fbm3_domwarp1(float x, float y, float z, uint32_t seed) {
-    const float warp_coeff = 1;
-    return fbm3(x + warp_coeff * fbm3(x, y, z, seed+69), y + warp_coeff * fbm3(x,y,z,seed+420), z + warp_coeff * fbm3(x,y,z, seed*12121), seed);
-}
-
-float fbm2_bilinear_domwarp2(float x, float y, uint32_t seed) {
-    const float warp_coeff = 1;
-    return fbm2_bilinear(x + warp_coeff * fbm2_bilinear_domwarp1(x, y, seed+1337), y + warp_coeff * fbm2_bilinear_domwarp1(x, y, seed+1919), seed);
-}
-
-float fbm2_bilinear_domwarp3(float x, float y, uint32_t seed) {
-    const float warp_coeff = 1;
-    return fbm2_bilinear_domwarp1(x + warp_coeff * fbm2_bilinear_domwarp1(x, y, seed+1337), y + warp_coeff * fbm2_bilinear_domwarp1(x, y, seed+1919), seed);
-}
-
-typedef struct {
-    float startx;
-    float starty;
-    float wx;
-    float wy;
-} transform_2d;
-
-/*
-void draw_noise(float (*noise_func)(float x, float y, uint32_t seed), transform_2d t, uint32_t seed) {
-    //int xres = gef_get_xres();
-    //int yres = gef_get_yres();
-
-    const float max = 2;
-
-    for (int i = 0; i < xres; i++) {
-        for (int j = 0; j < yres; j++) {
-            float x = t.startx + ((float)i / (float)xres) * t.wx;
-            float y = t.starty + ((float)j / (float)yres) * t.wy;
-
-            float noise_sample = noise_func(x, y, seed) / max;
-            gef_put_pixel(i, j, 255 * noise_sample, 255 * noise_sample, 255 * noise_sample, 255);
-        }
-    }
-}
-
-void draw_3d_noise_time(float (*noise_func)(float x, float y, float z, uint32_t seed), transform_2d tform, uint32_t seed, float t) {
-    int xres = gef_get_xres();
-    int yres = gef_get_yres();
-
-    const float max = 2;
-
-    for (int i = 0; i < xres; i++) {
-        for (int j = 0; j < yres; j++) {
-            float x = tform.startx + ((float)i / (float)xres) * tform.wx;
-            float y = tform.starty + ((float)j / (float)yres) * tform.wy;
-
-            float noise_sample = noise_func(x, y, t, seed) / max;
-            gef_put_pixel(i, j, 255 * noise_sample, 255 * noise_sample, 255 * noise_sample, 255);
-        }
-    }   
-}
-
-void draw_noise_heightmap(float (*noise_func)(float x, float y, uint32_t seed), transform_2d t, uint32_t seed) {
-
-}
-*/
-
-vec3s normal_from_verts(vec3s a, vec3s b, vec3s c) {
-    vec3s ab = glms_vec3_sub(b,a);
-    vec3s bc = glms_vec3_sub(c,a);
-    return glms_vec3_normalize(glms_vec3_cross(bc, ab));
-}
-
-PNC_Vert make_vert(float x, float y, float z, vec3s normal) {
+PNC_Vert make_vert(float x, float y, float z, vec3s normal,
+                float xscale, float yscale, float zscale) {
     const vec3s low_colour = {0.2, 0.5, 0};
     const vec3s high_colour = {0.5, 0.5, 0};
 
     return (PNC_Vert) {
-            .pos = {x, y, z},
-            .normal = normal,
+            .pos = {x*xscale, y*yscale, z*zscale},
+            .normal = normal, // todo maybe normalize for the scale
             .colour = glms_vec3_lerp(low_colour, high_colour, y),
     };
 }
 
 // alloc and make a mesh
+// todo replace y and z
 PNC_Mesh generate_mesh(float (*noise_func)(float x, float y, uint32_t seed),
         uint32_t seed,
         float startx, float endx, int xsamples,
-        float starty, float endy, int ysamples) {
+        float starty, float endy, int ysamples,
+        float xscale, float yscale, float zscale) {
 
     float stepx = (endx - startx) / xsamples;
     float stepy = (endy - starty) / ysamples;
@@ -158,14 +71,14 @@ PNC_Mesh generate_mesh(float (*noise_func)(float x, float y, uint32_t seed),
                 (vec3s) {x0, h01, y1}
             );
 
-            m.tris[tris_index][0] = make_vert(x0, h00, y0, normal_low);
-            m.tris[tris_index][1] = make_vert(x1, h10, y0, normal_low);
-            m.tris[tris_index][2] = make_vert(x0, h01, y1, normal_low);
+            m.tris[tris_index][0] = make_vert(x0, h00, y0, normal_low, xscale, yscale, zscale);
+            m.tris[tris_index][1] = make_vert(x1, h10, y0, normal_low, xscale, yscale, zscale);
+            m.tris[tris_index][2] = make_vert(x0, h01, y1, normal_low, xscale, yscale, zscale);
             tris_index++;
             
-            m.tris[tris_index][0] = make_vert(x1, h10, y0, normal_low);
-            m.tris[tris_index][1] = make_vert(x1, h11, y1, normal_low);
-            m.tris[tris_index][2] = make_vert(x0, h01, y1, normal_low);
+            m.tris[tris_index][0] = make_vert(x1, h10, y0, normal_low, xscale, yscale, zscale);
+            m.tris[tris_index][1] = make_vert(x1, h11, y1, normal_low, xscale, yscale, zscale);
+            m.tris[tris_index][2] = make_vert(x0, h01, y1, normal_low, xscale, yscale, zscale);
             tris_index++;
         }
     }
@@ -173,35 +86,62 @@ PNC_Mesh generate_mesh(float (*noise_func)(float x, float y, uint32_t seed),
 }
 
 typedef enum {
+    NM_FRACTAL,
+    NM_DOMWARP_1,
+    NM_DOMWARP_2,
     NM_DOMWARP_3,
     NM_RIDGE,
     NM_BILLOW,
     NUM_NM,
 } noise_mode;
 
-//PNC_Mesh meshes[NUM_NM] = {0};
-
 typedef float(*noise2d_func)(float, float, uint32_t);
 
 noise2d_func noise_funcs[NUM_NM] = {
+    fbm2_bilinear,
+    fbm2_bilinear_domwarp1,
+    fbm2_bilinear_domwarp2,
     fbm2_bilinear_domwarp3,
     billow,
     ridge,
 };
 
+char *nm_name[NUM_NM] = {
+    "fractal",
+    "domwarp 1",
+    "domwarp 2",
+    "domwarp 3",
+    "ridge",
+    "billow",
+};
+
+noise_mode current_noise_mode = 0;
+
+
 vao nm_vao[NUM_NM] = {0};
 PNC_Mesh nm_mesh[NUM_NM] = {0};
+
+void switch_terrain(noise_mode nm, uint32_t seed) {
+    current_noise_mode = nm;
+    printf("switched to %s\n", nm_name[nm]);
+    if (!nm_mesh[nm].tris) {
+        // if we need to generate this one
+        nm_mesh[nm] = generate_mesh(noise_funcs[nm], seed,
+            -5, 5, 1000,
+            -5, 5, 1000,
+            10, 5, 10
+        );
+        nm_vao[nm] = ggl_upload_pnc(nm_mesh[nm]);
+    }
+}
 
 int main(int argc, char** argv) {
     int xres = 1920;
     int yres = 1080;
 
-    int noise_mode = 0;
 
     gg_context *g = ggl_init("nxplore", xres, yres);
     SDL_SetRelativeMouseMode(SDL_TRUE);
-
-    uint32_t seed = 123456;
 
     float t = 0;
 
@@ -222,6 +162,10 @@ int main(int argc, char** argv) {
     
     mat4s view = GLMS_MAT4_IDENTITY_INIT;
     mat4s proj = GLMS_MAT4_IDENTITY_INIT;
+
+    uint32_t seed = 123456;
+    switch_terrain(0, seed);
+
 
     bool do_2d = true;
     bool keep_going = true;
@@ -254,15 +198,7 @@ int main(int argc, char** argv) {
                 } else if (sym >= SDLK_1 && sym <= SDLK_9) {
                     int nm = sym - SDLK_1;
                     if (nm < NUM_NM) {
-                        noise_mode = nm;
-                        if (!nm_mesh[nm].tris) {
-                            // if we need to generate this one
-                            nm_mesh[nm] = generate_mesh(noise_funcs[nm], seed,
-                                -5, 5, 1000,
-                                -5, 5, 1000
-                            );
-                            nm_vao[nm] = ggl_upload_pnc(nm_mesh[nm]);
-                        }
+                        switch_terrain(nm, seed);                       
                     }
                 }
             } else if (e.type == SDL_MOUSEMOTION) {
@@ -299,8 +235,8 @@ int main(int argc, char** argv) {
         glUseProgram(heightmap_pgm);
         glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "view"), 1, GL_FALSE, view.raw[0]);
         glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "proj"), 1, GL_FALSE, proj.raw[0]);
-        glBindVertexArray(nm_vao[noise_mode]);
-        glDrawArrays(GL_TRIANGLES, 0, nm_mesh[noise_mode].num_tris * 3); // handle should probably contain num triangles
+        glBindVertexArray(nm_vao[current_noise_mode]);
+        glDrawArrays(GL_TRIANGLES, 0, nm_mesh[current_noise_mode].num_tris * 3); // handle should probably contain num triangles
 
         SDL_GL_SwapWindow(g->window);
     }
