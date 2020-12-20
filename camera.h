@@ -11,4 +11,5 @@ typedef struct {
 } camera;
 
 camera fly_camera();
-camera camera_update(camera c, int x, int y);
+camera camera_update_look (camera c, int x, int y);
+camera camera_update_move(camera c, float distance, bool forward, bool backward, bool left, bool right, bool up, bool down);

@@ -2,20 +2,21 @@
 #include "mymath.h"
 #include <math.h>
 
+
 camera fly_camera() {
-    camera cam;
+    camera c;
 
-    cam.pos = (vec3s) {0,0,0};
-    cam.front = (vec3s) {0,0,-1};
-    cam.up = (vec3s) {0,1,0};
-    cam.pitch = 0;
-    cam.yaw = -90;
-    cam.fovx = 90;
+    c.pos = (vec3s) {0,0,0};
+    c.front = (vec3s) {0,0,-1};
+    c.up = (vec3s) {0,1,0};
+    c.pitch = 0;
+    c.yaw = -90;
+    c.fovx = 90;
 
-    return cam;
+    return c;
 }
 
-camera camera_update(camera c, int x, int y) {
+camera camera_update_look(camera c, int x, int y) {
     const float sensitivity = 0.05;
 
     float xf = sensitivity * x;
@@ -32,6 +33,38 @@ camera camera_update(camera c, int x, int y) {
     direction.y = sin(glm_rad(c.pitch));
     direction.z = sin(glm_rad(c.yaw)) * cos(glm_rad(c.pitch));
     c.front = glms_normalize(direction);
+
+    return c;
+}
+
+camera camera_update_move(camera c, float distance,
+    bool forward,
+    bool backward,
+    bool left,
+    bool right,
+    bool up,
+    bool down) {
+
+    if (forward) {
+        c.pos = glms_vec3_add(c.pos, glms_vec3_scale(c.front, distance));
+    }
+    if (backward) {
+        c.pos = glms_vec3_add(c.pos, glms_vec3_scale(c.front, -1 * distance));
+    }
+    if (left) {
+        vec3s cam_left = glms_normalize(glms_vec3_cross(c.up, c.front));
+        c.pos = glms_vec3_add(c.pos, glms_vec3_scale(cam_left, distance));
+    }
+    if (right) {
+        vec3s cam_left = glms_normalize(glms_vec3_cross(c.up, c.front));
+        c.pos = glms_vec3_add(c.pos, glms_vec3_scale(cam_left, -1 * distance));
+    }
+    if (up) {
+        c.pos = glms_vec3_add(c.pos, glms_vec3_scale(c.up, distance));
+    }
+    if (down) {
+        c.pos = glms_vec3_add(c.pos, glms_vec3_scale(c.up, -1 * distance));
+    }
 
     return c;
 }
