@@ -18,3 +18,5 @@ float quant_err(float x, float y, uint32_t seed);
 #define max(A,B) A > B ? A : B
 
 vec3s normal_from_verts(vec3s a, vec3s b, vec3s c);
+
+vec3s bilinear_normal(float a, float b, float c, float d, float t1, float t2);

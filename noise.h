@@ -11,3 +11,13 @@ float fbm2_bilinear_domwarp1(float x, float y, uint32_t seed);
 float fbm2_bilinear_domwarp2(float x, float y, uint32_t seed);
 float fbm2_bilinear_domwarp3(float x, float y, uint32_t seed);
 float fbm3_domwarp1(float x, float y, float z, uint32_t seed);
+
+float billow_ridge(float x, float y, uint32_t seed);
+
+typedef struct {
+    float value;
+    vec3s normal;
+} noise_result;
+
+noise_result noise2_normal(float x, float y, uint32_t seed);
+noise_result fbm2_normal(float x, float y, uint32_t seed);

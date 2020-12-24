@@ -1,4 +1,5 @@
 #include "mymath.h"
+#include <math.h>
 
 float fastfloor(float x) {
     if (x > 0) {
@@ -24,6 +25,33 @@ float lerp(float a, float b, float t) {
 float bilinear(float a, float b, float c, float d, float t1, float t2) {
     return lerp(lerp(a,b,t1),lerp(c,d,t1),t2);
 }
+
+float bilinear_dydx(float a, float b, float c, float d, float t1, float t2) {
+    return lerp((a-b), (c-d), t2);
+}
+float bilinear_dydz(float a, float b, float c, float d, float t1, float t2) {
+    return lerp((a-c), (b-d), t1);
+}
+vec3s bilinear_normal(float a, float b, float c, float d, float t1, float t2) {
+    float dydx = bilinear_dydx(a, b, c, d, t1, t2);
+    float dydz = bilinear_dydz(a, b, c, d, t1, t2);
+
+    vec3s tangent_x = {
+        1,
+        dydx,
+        0
+    };
+
+    vec3s tangent_z = {
+        0,
+        dydz,
+        1
+    };
+
+    return glms_vec3_cross(tangent_x, tangent_z);
+}
+
+
 float trilinear(float a, float b, float c, float d, float e, float f, float g, float h, float x, float y, float z) {
     return lerp(bilinear(a,b,c,d,x,y), bilinear(e, f, g, h, x, y), z);
 }
@@ -31,17 +59,33 @@ float trilinear(float a, float b, float c, float d, float e, float f, float g, f
 float u3(float x) {
     return x*x*(3-2*x);
 }
+float u3d(float x) {
+    return 6*x*(1-x);
+}
 float interp3(float a, float b, float t) {
     return lerp(a,b,u3(t));
 }
+
 float u5(float x) {
-    return x*x*(10-3*x*(5-2*x));
+    return x*x*x*(10-3*x*(5-2*x));
 }
 float interp5(float a, float b, float t) {
     return lerp(a,b,u5(t));
 }
 float bilinear3(float a, float b, float c, float d, float t1, float t2) {
     return interp3(interp3(a,b,t1),interp3(c,d,t1),t2);
+}
+float bilinear3_dydx(float a, float b, float c, float d, float t1, float t2) {
+    // yea not sure, gotta do some testing on this 1
+    return lerp(
+        lerp(
+            a-b, c-d, u3(t)
+        ),
+        lerp(
+            a-b, c-d, u3(t)
+        ),
+        a-b, c-d, 
+    )
 }
 float trilinear3(float a, float b, float c, float d, float e, float f, float g, float h, float x, float y, float z) {
     return interp3(bilinear3(a,b,c,d,x,y), bilinear3(e, f, g, h, x, y), z);

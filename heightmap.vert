@@ -16,7 +16,7 @@ void main() {
     gl_Position = proj * view * vec4(pos, 1);
 
     //vec3 vert_colour = gl_Position.xyz;
-    //vert_colour = normal;
+    //vert_colour = (normal + 1) / 2;
     float sunness = dot(normal, sun);
     vert_colour = colour * (0.7 + 0.3*sunness);
     //vert_colour = vec3(1,0,0);

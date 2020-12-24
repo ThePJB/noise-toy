@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "mymath.h"
+#include "noise.h"
 /* 
     Hash functions 
     TODO - how cheap can you make them for terrain? like halve the instructions
@@ -109,7 +110,7 @@ float billow(float x, float y, uint32_t seed) {
 }
 
 float ridge(float x, float y, uint32_t seed) {
-    return 1 - billow(x, y, seed);
+    return 1 - (fast_abs((1 - fbm2_bilinear(x, y, seed)) - 0.5) * 2);
 }
 
 float fbm2_bilinear_domwarp1(float x, float y, uint32_t seed) {
@@ -130,4 +131,54 @@ float fbm2_bilinear_domwarp2(float x, float y, uint32_t seed) {
 float fbm2_bilinear_domwarp3(float x, float y, uint32_t seed) {
     const float warp_coeff = 1;
     return fbm2_bilinear_domwarp1(x + warp_coeff * fbm2_bilinear_domwarp1(x, y, seed+1337), y + warp_coeff * fbm2_bilinear_domwarp1(x, y, seed+1919), seed);
+}
+
+float billow_ridge(float x, float y, uint32_t seed) {
+    float governor = fbm2_bilinear(x, y, seed*1233249);
+    float b = billow(x, y, seed+213987);
+    float r = ridge(x, y, seed+98731);
+    //return governor;
+    //return lerp(b, r, governor);
+    return b*r;
+}
+
+
+noise_result noise2_normal(float x, float y, uint32_t seed) {
+    noise_result res;
+    double a = (double) squirrel3_2(x, y, seed) / U32_MAX;
+    double b = (double) squirrel3_2(x + 1, y, seed) / U32_MAX;
+    double c = (double) squirrel3_2(x, y + 1, seed) / U32_MAX;
+    double d = (double) squirrel3_2(x + 1, y + 1, seed) / U32_MAX;
+    res.value = bilinear(a,b,c,d,frac(x),frac(y));
+    res.normal = bilinear_normal(a,b,c,d,frac(x),frac(y));
+    return res;
+}
+
+noise_result fbm2_normal(float x, float y, uint32_t seed) {
+    noise_result res1 = noise2_normal(x * 1, y * 1, seed + 1234);
+    noise_result res2 = noise2_normal(x * 2, y * 2, seed + 5466);
+    noise_result res3 = noise2_normal(x * 4, y * 4, seed + 9078);
+    noise_result res4 = noise2_normal(x * 8, y * 8, seed + 1704);
+    noise_result res5 = noise2_normal(x * 16, y * 16, seed + 4568);
+
+    noise_result res;
+
+    res.value = (
+        1.00000 * res1.value + 
+        0.50000 * res2.value +
+        0.25000 * res3.value +
+        0.12500 * res4.value + 
+        0.06125 * res5.value
+    ) / 1.875;
+
+    //res.value = fbm2_bilinear(x, y, seed); // not this probably
+
+    res.normal = glms_vec3_normalize(
+        glms_vec3_add(res1.normal, 
+        glms_vec3_add(glms_vec3_scale(res2.normal, 0.5), 
+        glms_vec3_add(glms_vec3_scale(res3.normal, 0.25), 
+        glms_vec3_add(glms_vec3_scale(res4.normal, 0.125), 
+        glms_vec3_scale(res5.normal, 0.06125)))))
+    );
+    return res;
 }
