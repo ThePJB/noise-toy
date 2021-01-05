@@ -204,23 +204,24 @@ int main(int argc, char** argv) {
     camera cam = fly_camera();
 
     uint32_t seed = 123456;
-
+/*
     PNC_Mesh m = generate_mesh_an(fbm2_normal, seed,
             -5, 5, 1000,
             -5, 5, 1000,
             5, 5, 5
     );
-    vao m_vao = ggl_upload_pnc(m);
+    */
+    //vao m_vao = ggl_upload_pnc(m);
     
-    //switch_terrain(0, seed);
+    switch_terrain(0, seed);
 
     bool keep_going = true;
     double dt = 0;
     while(keep_going) {
         int64_t tstart = get_us();
         keep_going = handle_input(dt, &cam, seed);
-        //draw(g, cam, heightmap_pgm);
-        draw_mesh(g, cam, heightmap_pgm, m, m_vao);
+        draw(g, cam, heightmap_pgm);
+        //draw_mesh(g, cam, heightmap_pgm, m, m_vao);
         int64_t tend = get_us();
         int64_t remaining_us = tend - tstart;
         dt = ((double)remaining_us) / 1000000;

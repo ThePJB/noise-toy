@@ -75,6 +75,7 @@ float interp5(float a, float b, float t) {
 float bilinear3(float a, float b, float c, float d, float t1, float t2) {
     return interp3(interp3(a,b,t1),interp3(c,d,t1),t2);
 }
+/*
 float bilinear3_dydx(float a, float b, float c, float d, float t1, float t2) {
     // yea not sure, gotta do some testing on this 1
     return lerp(
@@ -87,6 +88,7 @@ float bilinear3_dydx(float a, float b, float c, float d, float t1, float t2) {
         a-b, c-d, 
     )
 }
+*/
 float trilinear3(float a, float b, float c, float d, float e, float f, float g, float h, float x, float y, float z) {
     return interp3(bilinear3(a,b,c,d,x,y), bilinear3(e, f, g, h, x, y), z);
 }
