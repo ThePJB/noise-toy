@@ -15,6 +15,15 @@ bool handle_input(double dt, camera *cam, uint32_t seed);
 void draw(gg_context *g, camera cam, shader_pgm_id heightmap_pgm);
 void draw_mesh(gg_context *g, camera cam, shader_pgm_id heightmap_pgm, PNC_Mesh m, vao m_vao);
 
+typedef struct {
+    gg_context *g;
+    camera cam;
+    shader_pgm_id heightmap_pgm;
+    
+    PNC_Mesh terrain;
+    uint32_t current_seed;
+} application;
+
 PNC_Vert make_vert(float x, float y, float z, vec3s normal,
                 float xscale, float yscale, float zscale) {
     const vec3s low_colour = {0.2, 0.5, 0};
@@ -189,8 +198,8 @@ int main(int argc, char** argv) {
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     // make shaders
-    char *vert = slurp("heightmap.vert");
-    char *frag = slurp("heightmap.frag");
+    char *vert = slurp("shaders/heightmap.vert");
+    char *frag = slurp("shaders/heightmap.frag");
 
     printf("heightmap.vert\n");
     shader_id vert_id = ggl_make_shader(g, vert, GL_VERTEX_SHADER);
