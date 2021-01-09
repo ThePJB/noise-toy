@@ -5,24 +5,63 @@
 #include <unistd.h>
 
 #include "ggl.h"
+#include "pnc.h"
 #include "mymath.h"
 #include "util.h"
 #include "glad.h"
 #include "noise.h"
 #include "camera.h"
 
-bool handle_input(double dt, camera *cam, uint32_t seed);
-void draw(gg_context *g, camera cam, shader_pgm_id heightmap_pgm);
-void draw_mesh(gg_context *g, camera cam, shader_pgm_id heightmap_pgm, PNC_Mesh m, vao m_vao);
+
+
+typedef enum {
+    NM_FRACTAL,
+    NM_DOMWARP_1,
+    NM_DOMWARP_2,
+    NM_DOMWARP_3,
+    NM_RIDGE,
+    NM_BILLOW,
+    NM_BR,
+    NUM_NM,
+} noise_mode;
+
+typedef float(*noise2d_func)(float, float, uint32_t);
+
+noise2d_func noise_funcs[NUM_NM] = {
+    fbm2_bilinear,
+    fbm2_bilinear_domwarp1,
+    fbm2_bilinear_domwarp2,
+    fbm2_bilinear_domwarp3,
+    billow,
+    ridge,
+    billow_ridge,
+};
+
+char *nm_name[NUM_NM] = {
+    "fractal",
+    "domwarp 1",
+    "domwarp 2",
+    "domwarp 3",
+    "billow",
+    "ridge",
+    "billow-ridge",
+};
+
 
 typedef struct {
     gg_context *g;
     camera cam;
     shader_pgm_id heightmap_pgm;
     
-    PNC_Mesh terrain;
     uint32_t current_seed;
+    noise_mode current_noise_mode;
+    PNC_Mesh terrain[NUM_NM];
+
+    bool keep_going;
 } application;
+
+void handle_input(application *app, double dt);
+void draw(application *app);
 
 PNC_Vert make_vert(float x, float y, float z, vec3s normal,
                 float xscale, float yscale, float zscale) {
@@ -136,55 +175,18 @@ PNC_Mesh generate_mesh_an(noise_result (*noise_func)(float x, float y, uint32_t 
     return m;
 }
 
-typedef enum {
-    NM_FRACTAL,
-    NM_DOMWARP_1,
-    NM_DOMWARP_2,
-    NM_DOMWARP_3,
-    NM_RIDGE,
-    NM_BILLOW,
-    NM_BR,
-    NUM_NM,
-} noise_mode;
 
-typedef float(*noise2d_func)(float, float, uint32_t);
-
-noise2d_func noise_funcs[NUM_NM] = {
-    fbm2_bilinear,
-    fbm2_bilinear_domwarp1,
-    fbm2_bilinear_domwarp2,
-    fbm2_bilinear_domwarp3,
-    billow,
-    ridge,
-    billow_ridge,
-};
-
-char *nm_name[NUM_NM] = {
-    "fractal",
-    "domwarp 1",
-    "domwarp 2",
-    "domwarp 3",
-    "billow",
-    "ridge",
-    "billow-ridge",
-};
-
-noise_mode current_noise_mode = 0;
-
-vao nm_vao[NUM_NM] = {0};
-PNC_Mesh nm_mesh[NUM_NM] = {0};
-
-void switch_terrain(noise_mode nm, uint32_t seed) {
-    current_noise_mode = nm;
+void switch_terrain(application *app, noise_mode nm) {
+    app->current_noise_mode = nm;
     printf("switched to %s\n", nm_name[nm]);
-    if (!nm_mesh[nm].tris) {
+    if (!app->terrain[nm].tris) {
         // if we need to generate this one
-        nm_mesh[nm] = generate_mesh(noise_funcs[nm], seed,
+        app->terrain[nm] = generate_mesh(noise_funcs[nm], app->current_seed,
             -5, 5, 1000,
             -5, 5, 1000,
             10, 5, 10
         );
-        nm_vao[nm] = ggl_upload_pnc(nm_mesh[nm]);
+        pnc_upload(&app->terrain[nm]);
     }
 }
 
@@ -210,27 +212,24 @@ int main(int argc, char** argv) {
     free(vert);
     free(frag);
 
-    camera cam = fly_camera();
+    application app = (application) {
+        .g = g,
+        .cam = fly_camera(),
+        .current_seed = 123456,
+        .current_noise_mode = 0,
+        .terrain = {0},
+        .heightmap_pgm = heightmap_pgm,
+        .keep_going = true,
+    };
 
-    uint32_t seed = 123456;
-/*
-    PNC_Mesh m = generate_mesh_an(fbm2_normal, seed,
-            -5, 5, 1000,
-            -5, 5, 1000,
-            5, 5, 5
-    );
-    */
-    //vao m_vao = ggl_upload_pnc(m);
     
-    switch_terrain(0, seed);
+    switch_terrain(&app, 0);
 
-    bool keep_going = true;
     double dt = 0;
-    while(keep_going) {
+    while(app.keep_going) {
         int64_t tstart = get_us();
-        keep_going = handle_input(dt, &cam, seed);
-        draw(g, cam, heightmap_pgm);
-        //draw_mesh(g, cam, heightmap_pgm, m, m_vao);
+        handle_input(&app, dt);
+        draw(&app);
         int64_t tend = get_us();
         int64_t remaining_us = tend - tstart;
         dt = ((double)remaining_us) / 1000000;
@@ -242,88 +241,59 @@ int main(int argc, char** argv) {
     ggl_teardown(g);
 }
 
-bool handle_input(double dt, camera *cam, uint32_t seed) {
+void handle_input(application *app, double dt) {
     // Events
     SDL_Event e;
     while (SDL_PollEvent(&e) != 0) {
-        if (e.type == SDL_QUIT) return false;
+        if (e.type == SDL_QUIT) {
+            app->keep_going = false;
+            return;
+        }
         if (e.type == SDL_KEYDOWN) {
             SDL_Keycode sym = e.key.keysym.sym;
             if (sym == SDLK_ESCAPE) {
-                return false;
+                app->keep_going = false;
+                return;
             } else if (sym >= SDLK_1 && sym <= SDLK_9) {
                 int nm = sym - SDLK_1;
                 if (nm < NUM_NM) {
-                    switch_terrain(nm, seed);                       
+                    switch_terrain(app, nm);                       
                 }
             }
         } else if (e.type == SDL_MOUSEMOTION) {
-            *cam = camera_update_look(*cam, e.motion.xrel, e.motion.yrel);
+            app->cam = camera_update_look(app->cam, e.motion.xrel, e.motion.yrel);
         }
     }
 
     // Held
     const uint8_t *state = SDL_GetKeyboardState(NULL);
-    *cam = camera_update_move(*cam, 10 * dt, 
+    app->cam = camera_update_move(app->cam, 10 * dt, 
         state[SDL_SCANCODE_W],
         state[SDL_SCANCODE_S],
         state[SDL_SCANCODE_A],
         state[SDL_SCANCODE_D],
         state[SDL_SCANCODE_SPACE],
         state[SDL_SCANCODE_LSHIFT]);
-
-    return true;
 }
 
-void draw(gg_context *g, camera cam, shader_pgm_id heightmap_pgm) {
+void draw(application *app) {
 
     // draw
     mat4s view = glms_lookat(
-        cam.pos, 
-        glms_vec3_add(cam.pos, cam.front),
-        cam.up
+        app->cam.pos, 
+        glms_vec3_add(app->cam.pos, app->cam.front),
+        app->cam.up
     );
 
     mat4s proj = glms_perspective(
-        glm_rad(cam.fovx), 
-        (float)g->xres / (float)g->yres, 0.1, 10000
+        glm_rad(app->cam.fovx), 
+        (float)app->g->xres / (float)app->g->yres, 0.1, 10000
     );
 
     glClearColor(0.3, 0.5, 0.7, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    pnc_draw(app->terrain[app->current_noise_mode], app->heightmap_pgm, view.raw[0], proj.raw[0]);
 
-    glUseProgram(heightmap_pgm);
-    glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "view"), 1, GL_FALSE, view.raw[0]);
-    glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "proj"), 1, GL_FALSE, proj.raw[0]);
-    glBindVertexArray(nm_vao[current_noise_mode]);
-    glDrawArrays(GL_TRIANGLES, 0, nm_mesh[current_noise_mode].num_tris * 3); // handle should probably contain num triangles
-
-    SDL_GL_SwapWindow(g->window);
-}
-
-
-void draw_mesh(gg_context *g, camera cam, shader_pgm_id heightmap_pgm, PNC_Mesh m, vao m_vao) {
-
-    // draw
-    mat4s view = glms_lookat(
-        cam.pos, 
-        glms_vec3_add(cam.pos, cam.front),
-        cam.up
-    );
-
-    mat4s proj = glms_perspective(
-        glm_rad(cam.fovx), 
-        (float)g->xres / (float)g->yres, 0.1, 10000
-    );
-
-    glClearColor(0.3, 0.5, 0.7, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glUseProgram(heightmap_pgm);
-    glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "view"), 1, GL_FALSE, view.raw[0]);
-    glUniformMatrix4fv(glGetUniformLocation(heightmap_pgm, "proj"), 1, GL_FALSE, proj.raw[0]);
-    glBindVertexArray(m_vao);
-    glDrawArrays(GL_TRIANGLES, 0, m.num_tris * 3); // handle should probably contain num triangles
-
-    SDL_GL_SwapWindow(g->window);
+    SDL_GL_SwapWindow(app->g->window);
 }

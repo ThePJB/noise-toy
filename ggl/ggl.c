@@ -3,12 +3,7 @@
 #include "glad.h"
 #include "ggl.h"
 
-
-
 // good graphics library
-// to replace my name gef
-
-
 
 void ggl_teardown(gg_context *g) {
     SDL_DestroyWindow(g->window);
@@ -101,36 +96,3 @@ shader_pgm_id ggl_make_shader_pgm(gg_context *g, shader_id vertex_shader, shader
     return shader_program;
 }
 
-// i have a feeling doing this for fresh for every chunk may have been why it was slow in voxelgame
-// or maybe leaking vbo or something idk
-vao ggl_upload_pnc(PNC_Mesh m) {
-    vao pnc_vao;
-    vbo pnc_vbo;
-    glGenVertexArrays(1, &pnc_vao);
-    glGenBuffers(1, &pnc_vbo);
-    glBindVertexArray(pnc_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, pnc_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(PNC_Tri) * m.num_tris, m.tris, GL_STATIC_DRAW);
-    
-    size_t offset = 0;
-
-    // pos
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PNC_Vert), (void*)offset);
-    glEnableVertexAttribArray(0);
-    offset += 3 * sizeof(float);
-
-    // true is for normalize (normal)
-    // normal
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PNC_Vert), (void*)offset);
-    glEnableVertexAttribArray(1);
-    offset += 3 * sizeof(float);
-    
-    // colour
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(PNC_Vert), (void*)offset);
-    glEnableVertexAttribArray(2);
-    offset += 3 * sizeof(float);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    return pnc_vao;
-}

@@ -20,3 +20,7 @@ float quant_err(float x, float y, uint32_t seed);
 vec3s normal_from_verts(vec3s a, vec3s b, vec3s c);
 
 vec3s bilinear_normal(float a, float b, float c, float d, float t1, float t2);
+
+float ellipse_radius(float a, float b, float theta);
+float unlerp(float a, float b, float t);
+float remap(float prev_lower, float prev_upper, float new_lower, float new_upper, float a);
