@@ -19,13 +19,16 @@ typedef struct {
     vao vao;
     vbo vbo;
 
+    mat4s model;
+
     bool uploaded;
 
 } PNC_Mesh;
 
-PNC_Mesh pnc_new();
+PNC_Mesh pnc_new(mat4s model);
 
-void pnc_push_tri(PNC_Mesh *m, PNC_Vert v1, PNC_Vert v2, PNC_Vert v3);
+void pnc_push_tri(PNC_Mesh *m, PNC_Vert v1, PNC_Vert v2, PNC_Vert v3, mat4s transform);
+
 void pnc_push_trunc_cone(
         PNC_Mesh *m,
         vec3s colour, 
@@ -35,7 +38,10 @@ void pnc_push_trunc_cone(
         vec3s bot_axis,
         float r_top,
         float r_bot,
-        int num_sides);
+        int num_sides,
+        mat4s transform);
+
+/*
 void pnc_push_cone(
         PNC_Mesh *m,
         vec3s colour, 
@@ -45,6 +51,8 @@ void pnc_push_cone(
         vec3s bot_axis,
         float r_bot,
         int num_sides);
+*/
+
 void pnc_push_ellipsoid(
         PNC_Mesh *m,
         vec3s colour, 
@@ -53,7 +61,8 @@ void pnc_push_ellipsoid(
         float d,
         float h,
         int circ_sides,
-        int h_sides);
+        int h_sides,
+        mat4s transform);
 
 
 void pnc_upload(PNC_Mesh *m);

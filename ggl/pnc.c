@@ -44,6 +44,7 @@ void pnc_draw(PNC_Mesh m, shader_pgm_id pgm, float *view, float *proj) {
     glUseProgram(pgm);
     glUniformMatrix4fv(glGetUniformLocation(pgm, "view"), 1, GL_FALSE, view);
     glUniformMatrix4fv(glGetUniformLocation(pgm, "proj"), 1, GL_FALSE, proj);
+    glUniformMatrix4fv(glGetUniformLocation(pgm, "model"), 1, GL_FALSE, m.model.raw[0]);
     glBindVertexArray(m.vao);
     glDrawArrays(GL_TRIANGLES, 0, m.num_tris * 3); // handle should probably contain num triangles
 }
@@ -51,20 +52,27 @@ void pnc_draw(PNC_Mesh m, shader_pgm_id pgm, float *view, float *proj) {
 // todo free from ram
 // todo free from vram
 
-PNC_Mesh pnc_new() {
+PNC_Mesh pnc_new(mat4s model) {
     const size_t default_backing_mesh_size = 10;
 
     PNC_Mesh m = {0};
     m.tris = calloc(default_backing_mesh_size, sizeof(PNC_Tri));
     m.backing_length = default_backing_mesh_size;
+    m.model = model;
     return m;
 }
 
-void pnc_push_tri(PNC_Mesh *m, PNC_Vert v1, PNC_Vert v2, PNC_Vert v3) {
+void pnc_push_tri(PNC_Mesh *m, PNC_Vert v1, PNC_Vert v2, PNC_Vert v3, mat4s transform) {
     if (m->num_tris >= m->backing_length) {
         m->tris = realloc(m->tris, m->backing_length * 2 * sizeof(PNC_Tri));
         m->backing_length *= 2;
     }
+
+    v1.pos = glms_mat4_mulv3(transform, v1.pos, 1);
+    v2.pos = glms_mat4_mulv3(transform, v2.pos, 1);
+    v3.pos = glms_mat4_mulv3(transform, v3.pos, 1);
+
+    // todo take care of the normals
 
     m->tris[m->num_tris][0] = v1;
     m->tris[m->num_tris][1] = v2;
@@ -73,7 +81,7 @@ void pnc_push_tri(PNC_Mesh *m, PNC_Vert v1, PNC_Vert v2, PNC_Vert v3) {
 }
 
 PNC_Mesh pnc_test_mesh() {
-    PNC_Mesh m = pnc_new();
+    PNC_Mesh m = pnc_new(glms_mat4_identity());
 
     PNC_Vert v1, v2, v3;
     v1 = (PNC_Vert) {
@@ -91,7 +99,7 @@ PNC_Mesh pnc_test_mesh() {
         (vec3s) {0, 0, -1},
         (vec3s) {0, 0, 1}
     };
-    pnc_push_tri(&m, v1, v2, v3);
+    pnc_push_tri(&m, v1, v2, v3, glms_mat4_identity());
     
     return m;
 }
@@ -105,7 +113,8 @@ void pnc_push_trunc_cone(
         vec3s bot_axis,
         float r_top,
         float r_bot,
-        int num_sides) {
+        int num_sides,
+        mat4s transform) {
 
     float theta = 2 * M_PI / num_sides;
 
@@ -125,17 +134,20 @@ void pnc_push_trunc_cone(
         pnc_push_tri(m, 
             (PNC_Vert) {top1, normal1, colour},
             (PNC_Vert) {top2, normal1, colour},
-            (PNC_Vert) {bot1, normal1, colour}
+            (PNC_Vert) {bot1, normal1, colour},
+            transform
         );
 
         pnc_push_tri(m, 
             (PNC_Vert) {top2, normal2, colour},
             (PNC_Vert) {bot2, normal2, colour},
-            (PNC_Vert) {bot1, normal2, colour}
+            (PNC_Vert) {bot1, normal2, colour},
+            transform
         );
     }
 }
 
+/*
 void pnc_push_cone(
         PNC_Mesh *m,
         vec3s colour, 
@@ -144,7 +156,8 @@ void pnc_push_cone(
         vec3s bot_pos,
         vec3s bot_axis,
         float r_bot,
-        int num_sides) {
+        int num_sides,
+        transform) {
 
     float theta = 2 * M_PI / num_sides;
 
@@ -159,11 +172,12 @@ void pnc_push_cone(
         pnc_push_tri(m, 
             (PNC_Vert) {top_pos, normal1, colour},
             (PNC_Vert) {bot1, normal1, colour},
-            (PNC_Vert) {bot2, normal1, colour}
+            (PNC_Vert) {bot2, normal1, colour},
+            transform
         );
     }
 }
-
+*/
 
 
 void pnc_push_ellipsoid(
@@ -174,7 +188,8 @@ void pnc_push_ellipsoid(
         float d,
         float h,
         int circ_sides,
-        int h_sides) {
+        int h_sides,
+        mat4s transform) {
 
         axis = glms_vec3_normalize(axis);
     
@@ -194,7 +209,7 @@ void pnc_push_ellipsoid(
         vec3s top_pos = glms_vec3_add(center, glms_vec3_scale(axis, dist_top));
         vec3s bot_pos = glms_vec3_add(center, glms_vec3_scale(axis, dist_bot));
 
-        pnc_push_trunc_cone(m, colour, top_pos, axis, bot_pos, axis, r_top, r_bot, circ_sides);
+        pnc_push_trunc_cone(m, colour, top_pos, axis, bot_pos, axis, r_top, r_bot, circ_sides, transform);
     }
 }
 

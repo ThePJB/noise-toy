@@ -1,3 +1,5 @@
+#pragma once
+
 uint32_t squirrel3(int position, uint32_t seed);
 uint32_t squirrel3_2(int posx, int posy, uint32_t seed);
 uint32_t squirrel3_3(int posx, int posy, int posz, uint32_t seed);
@@ -18,6 +20,9 @@ typedef struct {
     float value;
     vec3s normal;
 } noise_result;
+
+typedef noise_result(*noise2d_func)(float, float, uint32_t);
+
 
 noise_result noise2_normal(float x, float y, uint32_t seed);
 noise_result fbm2_normal(float x, float y, uint32_t seed);

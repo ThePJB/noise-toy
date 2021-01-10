@@ -1,5 +1,6 @@
-#include <cglm/struct.h>
+#pragma once
 
+#include <cglm/struct.h>
 
 typedef struct {
     vec3s pos;

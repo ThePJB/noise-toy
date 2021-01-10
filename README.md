@@ -42,3 +42,11 @@ mesh should maybe just contain a vao
 
 add R to regenerate
 make it infinite
+
+
+# object placement
+so you can have a grid, where you conditionally place an object randomly within each grid square and then remove collisions at the edges
+can you vary grid size is what I want to know
+i think this kinda has to be done on a per chunk basis
+then u could vary number of subdivisions or whatever
+hmm but sampling for neighbour collisions gets hard then
